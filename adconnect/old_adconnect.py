@@ -1,11 +1,26 @@
 import sys
+import boto3
+import json
+from cryptography.fernet import Fernet
 from ldap3 import Server, Connection, ALL, NTLM, ALL_ATTRIBUTES, ALL_OPERATIONAL_ATTRIBUTES, AUTO_BIND_NO_TLS
 from datetime import datetime, timezone, timedelta
+
+
+
+
+def pw_decrypter():
+    key = b'Iixkr_C_Q8XbU3FoqfIgshj9d-Vnf3-cUMa9ThzwY-8='
+    cipher_suite = Fernet(key)
+    ciphered_text = b'gAAAAABd_S9TcWwZw0UpRH_GLHWd8KNcLLkmfLD-1-U1E0_XKqOeyB4Z8sIvvAXO27x4DmW79QZL4RteX6F8OQJLBR89jDCJjQ=='
+    unciphered_text = (cipher_suite.decrypt(ciphered_text))
+    pwd = str(unciphered_text)[2:15]
+    return pwd
+
 
 server_name = 'ad.prod.arc.travel'
 domain_name = 'arc.travel'
 user_name = 'svc_adpwnotifier'
-password = 'J0J0BizarreAD'
+password = pw_decrypter()
 
 server = Server(server_name, get_info=ALL)
 conn = Connection(server, user='{}\\{}'.format(domain_name, user_name), password=password, authentication=NTLM, auto_bind=True)
@@ -15,10 +30,10 @@ conn.search('ou=users,ou=arc,dc=arc,dc=travel'.format(domain_name), '(&(objectcl
 
 format_string = '{:21} {:26} {:15} {:13} {:22} {}'
 
-def print_ArcTravel_Users():
-    print(format_string.format('Name', 'mail', 'logonName','pwLastSet','Last Login', 'whenCreated'))
-    for e in conn.entries:
-        print(format_string.format(str(e.name), str(e.mail), str(e.sAMAccountName), str(e.pwdLastSet)[:11],str(e.lastLogon)[:19],str(e.whenCreated)[:11]))
+#def print_ArcTravel_Users():
+#    print(format_string.format('Name', 'mail', 'logonName','pwLastSet','Last Login', 'whenCreated'))
+#    for e in conn.entries:
+#        print(format_string.format(str(e.name), str(e.mail), str(e.sAMAccountName), str(e.pwdLastSet)[:11],str(e.lastLogon)[:19],str(e.whenCreated)[:11]))
     #    print(format_string.format(str(e.name)))
 
 #print_ArcTravel_Users()
@@ -55,11 +70,16 @@ def pwd_About_to_Expire():
 pwd_About_to_Expire()
 
 
-for i in aboutToExp:
-    for k,v in i.items():
-        print(k, ' : ', v)
-   #print(' ')
-for i in alreadyExp:
-    for k,v in i.items():
-        print(k, ' : ', v)
-        
+
+
+def lambda_handler(event, context):
+    string = json.dumps(aboutToExp)
+    #encoded_string = string.encode("utf-8")
+
+    bucket_name = "ad-pw-notify"
+    file_name = "testFile.txt"
+    lambda_path = file_name
+    s3_path = file_name
+
+    s3 = boto3.resource("s3")
+    s3.Bucket(bucket_name).put_object(Key=s3_path, Body=encoded_string)
